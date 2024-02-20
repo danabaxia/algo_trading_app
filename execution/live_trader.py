@@ -6,7 +6,8 @@ import robin_stocks.robinhood as r
 
 def robinhood_login():
     load_dotenv()  # Load environment variables from .env file
-    totp = pyotp.TOTP('NWPG3QHOSEVVNVKP').now()
+    key = os.getenv('key')
+    totp = pyotp.TOTP(key).now()
     username = os.getenv('ACCOUNT_NAME')
     password = os.getenv('ACCOUNT_PASSWORD')
     
