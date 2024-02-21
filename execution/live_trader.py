@@ -1,46 +1,57 @@
  # Module for live trading execution.
 import os
+import sys
 import pyotp
 from dotenv import load_dotenv
 import robin_stocks.robinhood as r
+import pandas as pd
 
 def robinhood_login():
-    load_dotenv()  # Load environment variables from .env file
-    key = os.getenv('key')
-    totp = pyotp.TOTP(key).now()
-    username = os.getenv('ACCOUNT_NAME')
-    password = os.getenv('ACCOUNT_PASSWORD')
-    
-    # Perform login
-    login_result = r.login(username, password, store_session=True, mfa_code=totp)
-    
-    return login_result
+    try:
+        load_dotenv()  # Ensures it's loaded only once by checking if called earlier
+        totp = pyotp.TOTP(os.getenv('ROBINHOOD_TOTP_SECRET')).now()
+        login_result = r.login(os.getenv('ROBINHOOD_USERNAME'),
+                               os.getenv('ROBINHOOD_PASSWORD'),
+                               store_session=True, mfa_code=totp)
+        if "access_token" in login_result:
+            print("Logged in to Robinhood.")
+        else:
+            print("Failed to login to Robinhood. Check credentials and TOTP.")
+    except Exception as e:
+        print(f"An error occurred during Robinhood login: {e}")
+        sys.exit(1)
 
-def place_buy_order(symbol, quantity):
-    """
-    Places a buy order for a given symbol and quantity.
-    """
-    # Ensure we are logged in
+def get_my_stock_holdings():
+    try:
+        pd.set_option('display.max_columns', 500)
+        pd.set_option('display.width', 1000)
+        my_stock_info = r.build_holdings()
+        p = pd.DataFrame.from_dict(my_stock_info, orient='index')
+        return p
+    except Exception as e:
+        print(f"Error fetching holdings: {e}")
+        return pd.DataFrame()  # Return empty DataFrame on error
+
+def get_total_equity(holdings):
+    return holdings['equity'].astype(float).sum()
+
+def get_cash_portfolio():
+    try:
+        data = r.profiles.load_account_profile()
+        return float(data['portfolio_cash'])
+    except Exception as e:
+        print(f"Error fetching cash portfolio: {e}")
+        return 0
+
+def main():
     robinhood_login()
-    
-    # Place buy order (market order as an example)
-    order_result = r.order_buy_market(symbol, quantity)
-    
-    return order_result
-
-def place_sell_order(symbol, quantity):
-    """
-    Places a sell order for a given symbol and quantity.
-    """
-    # Ensure we are logged in
-    robinhood_login()
-    
-    # Place sell order (market order as an example)
-    order_result = r.order_sell_market(symbol, quantity)
-    
-    return order_result
-
+    my_holdings = get_my_stock_holdings()
+    if not my_holdings.empty:
+        print(f"My Total Equity: {get_total_equity(my_holdings)}")
+        print(f"Cash Portfolio: {get_cash_portfolio()}")
+    else:
+        print("No holdings found or unable to fetch.")
 
 if __name__ == "__main__":
-    result = robinhood_login()
-    print(result)
+    main()
+
