@@ -1,49 +1,110 @@
 import requests
 import pandas as pd
-from dotenv import load_dotenv
-import os
+from datetime import datetime
+from config.settings import settings
 
-class FinancialDataFetcher:
+class MarketDataFetcher:
     BASE_URL = 'https://financialmodelingprep.com/api/v3'
     
     def __init__(self):
-        # Load environment variables from .env file
-        load_dotenv()
-        # Retrieve the API key
-        self.api_key = os.getenv('FMP_KEY')
+        self.api_key = settings.FMP_API_KEY
         if not self.api_key:
-            raise ValueError("No API key found in .env file")
+            print("Warning: FMP_API_KEY is not set. Market Data will fail.")
         self.session = requests.Session()
 
     def _request_api(self, endpoint, **params):
         """Private method to request data from the API."""
-        params['apikey'] = self.api_key  # Add the API key to the parameters
+        if not self.api_key:
+            raise ValueError("API Key missing")
+            
+        params['apikey'] = self.api_key
         try:
-            response = self.session.get(f"{self.BASE_URL}/{endpoint}", params=params)
+            url = f"{self.BASE_URL}/{endpoint}"
+            response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP Error: {e} | Response: {response.text}")
+            return None
+        except Exception as e:
             print(f"Request failed: {e}")
             return None
 
-    def get_financial_statement(self, ticker, statement_type, period='quarter'):
-        """Fetch financial statement data."""
-        return self._request_api(f"{statement_type}-statement/{ticker}", period=period)
+    def get_price(self, ticker):
+        """
+        Fetch the current real-time price for a ticker.
+        Endpoint: /quote-short/{ticker} or /quote/{ticker}
+        """
+        data = self._request_api(f"quote-short/{ticker}")
+        if data and isinstance(data, list) and len(data) > 0:
+            return data[0].get('price')
+        return None
+
+    def get_historical_candles(self, ticker, interval="1min", limit=100):
+        """
+        Fetch historical OHLCV candles (intraday).
+        Endpoint: /historical-chart/{interval}/{ticker}
+        """
+        endpoint = f"historical-chart/{interval}/{ticker}"
+        data = self._request_api(endpoint)
+        if data and isinstance(data, list):
+            df = pd.DataFrame(data)
+            return df
+        return pd.DataFrame()
+
+    def get_daily_history(self, ticker, days=365):
+        """
+        Fetch daily historical prices for long durations.
+        Endpoint: /historical-price-full/{ticker}?timeseries={days}
+        """
+        endpoint = f"historical-price-full/{ticker}"
+        data = self._request_api(endpoint, timeseries=days)
+        
+        # FMP returns: {"symbol": "AAPL", "historical": [...]}
+        if data and "historical" in data:
+            df = pd.DataFrame(data["historical"])
+            return df
+        return pd.DataFrame()
+
+    def get_technical_indicator(self, ticker, indicator_type="rsi", period=14, interval="daily"):
+        """
+        Fetch pre-calculated indicators from FMP.
+        indicator_type: 'sma', 'ema', 'rsi', 'adx', 'standardDeviation'
+        interval: 'daily', '1min', '5min', '15min'
+        """
+        # Construction: /technical_indicator/{interval}/{ticker}
+        endpoint = f"technical_indicator/{interval}/{ticker}"
+        params = {"type": indicator_type, "period": period}
+        
+        data = self._request_api(endpoint, **params)
+        if data and isinstance(data, list):
+            df = pd.DataFrame(data)
+            return df
+        return pd.DataFrame()
 
     def get_company_profile(self, ticker):
         """Fetch company profile data."""
         return self._request_api(f"profile/{ticker}")
 
-    # Define other methods as needed, using the _request_api method to fetch data
-
 def main():
-    financial_data = FinancialDataFetcher()
-
-    revenue_data = financial_data.get_financial_statement('AAPL', 'income', period='annual')
-    print(revenue_data)
-
-    profile_data = financial_data.get_company_profile('AAPL')
-    print(profile_data)
+    fetcher = MarketDataFetcher()
+    ticker = "AAPL"
+    
+    # 1. Price
+    print(f"Fetching price for {ticker}...")
+    print(f"Current: {fetcher.get_price(ticker)}")
+    
+    # 2. Daily History (Last 5 days)
+    print(f"\nFetching last 5 days daily history...")
+    daily = fetcher.get_daily_history(ticker, days=5)
+    if not daily.empty:
+        print(daily[['date', 'close', 'volume']].head())
+    
+    # 3. RSI Indicator
+    print(f"\nFetching Daily RSI(14)...")
+    rsi = fetcher.get_technical_indicator(ticker, indicator_type='rsi', period=14)
+    if not rsi.empty:
+        print(rsi[['date', 'rsi']].head())
 
 if __name__ == "__main__":
     main()

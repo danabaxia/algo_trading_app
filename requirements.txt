@@ -1,0 +1,9 @@
+sqlalchemy
+pandas
+requests
+python-dotenv
+robin_stocks
+pymysql
+alembic
+fastapi
+uvicorn
