@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import axios from 'axios'
 import './App.css'
 import Home from './Home'
+import SessionsList from './SessionsList'
 
 const API_URL = "http://localhost:8000"
 
@@ -96,6 +97,18 @@ function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  const handleGoHome = async () => {
+    // Stop the session before going home
+    if (sessionId) {
+      try {
+        await axios.post(`${API_URL}/sessions/${sessionId}/stop`)
+      } catch (e) {
+        console.error("Failed to stop session:", e)
+      }
+    }
+    navigate('/')
+  }
+
   if (loading) return <div className="dashboard-container">Loading data...</div>
 
   return (
@@ -103,7 +116,7 @@ function Dashboard() {
       <header className="header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <button
-            onClick={() => navigate('/')}
+            onClick={handleGoHome}
             style={{
               background: 'rgba(255,255,255,0.1)',
               border: 'none',
@@ -271,6 +284,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/paper" element={<SessionsList mode="PAPER" />} />
+        <Route path="/live" element={<SessionsList mode="LIVE" />} />
         <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </Router>

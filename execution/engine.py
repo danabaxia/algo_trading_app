@@ -18,10 +18,11 @@ logging.basicConfig(
 logger = logging.getLogger("TradingEngine")
 
 class TradingEngine:
-    def __init__(self, strategies, tickers, interval=60, paper_trading=True, broker=None, session_id=None):
+    def __init__(self, strategies, tickers, interval=60, paper_trading=True, broker=None, session_id=None, initial_balance=10000.0):
         """
         Initializes the Trading Engine.
         :param session_id: Link to the specific trading session in DB.
+        :param initial_balance: Starting capital for the session.
         """
         self.strategies = strategies
         self.tickers = tickers
@@ -29,6 +30,7 @@ class TradingEngine:
         self.paper_trading = paper_trading
         self.broker = broker
         self.session_id = session_id # New: Specific session ID
+        self.initial_balance = initial_balance
         self.is_running = False
         self.db = SessionLocal()
         self.data_fetcher = MarketDataFetcher()
@@ -43,10 +45,10 @@ class TradingEngine:
         if self.session_id:
             account = self.db.query(AccountBalance).filter_by(session_id=self.session_id).first()
             if not account:
-                logger.info(f"Initializing new Account for Session {self.session_id}")
+                logger.info(f"Initializing new Account for Session {self.session_id} with ${self.initial_balance}")
                 # Use mode from session_id logic or default
                 mode_str = "PAPER" if self.paper_trading else "LIVE"
-                acc = AccountBalance(session_id=self.session_id, mode=mode_str, cash_balance=10000.0, total_equity=10000.0)
+                acc = AccountBalance(session_id=self.session_id, mode=mode_str, cash_balance=self.initial_balance, total_equity=self.initial_balance)
                 self.db.add(acc)
                 self.db.commit()
         else:
@@ -54,7 +56,7 @@ class TradingEngine:
             mode_str = "PAPER" if self.paper_trading else "LIVE"
             account = self.db.query(AccountBalance).filter_by(mode=mode_str).first()
             if not account:
-                acc = AccountBalance(mode=mode_str, cash_balance=10000.0, total_equity=10000.0)
+                acc = AccountBalance(mode=mode_str, cash_balance=self.initial_balance, total_equity=self.initial_balance)
                 self.db.add(acc)
                 self.db.commit()
 

@@ -1,0 +1,205 @@
+.sessions-container {
+    min-height: 100vh;
+    padding: 2rem;
+    background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+    color: white;
+}
+
+.sessions-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.sessions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.home-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.home-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.sessions-header h1 {
+    font-size: 2rem;
+    margin: 0;
+}
+
+.sessions-header p {
+    color: #94a3b8;
+    margin: 0.25rem 0 0 0;
+    font-size: 0.9rem;
+}
+
+.new-session-btn {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.new-session-btn:hover {
+    background: #2563eb;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+}
+
+.empty-state p {
+    color: #94a3b8;
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+}
+
+.create-first-btn {
+    background: #34d399;
+    color: #0f172a;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 0.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.create-first-btn:hover {
+    background: #10b981;
+    transform: scale(1.05);
+}
+
+.sessions-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(30, 41, 59, 0.6);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.sessions-table thead {
+    background: rgba(15, 23, 42, 0.8);
+}
+
+.sessions-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: #cbd5e1;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.session-row {
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.session-row:hover {
+    background: rgba(96, 165, 250, 0.1);
+}
+
+.sessions-table td {
+    padding: 1rem;
+}
+
+.status-badge {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.status-badge.created {
+    background: rgba(148, 163, 184, 0.2);
+    color: #cbd5e1;
+}
+
+.status-badge.running {
+    background: rgba(52, 211, 153, 0.2);
+    color: #34d399;
+}
+
+.status-badge.stopped {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.actions-cell {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.action-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.action-btn.start {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    border-color: #10b981;
+}
+
+.action-btn.start:hover {
+    background: #10b981;
+    color: #0f172a;
+}
+
+.action-btn.stop {
+    background: rgba(245, 158, 11, 0.2);
+    color: #f59e0b;
+    border-color: #f59e0b;
+}
+
+.action-btn.stop:hover {
+    background: #f59e0b;
+    color: #0f172a;
+}
+
+.delete-btn-small {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid #ef4444;
+    color: #ef4444;
+    padding: 0.4rem 0.8rem;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+}
+
+.delete-btn-small:hover {
+    background: #ef4444;
+    color: white;
+}

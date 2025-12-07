@@ -16,11 +16,11 @@ class SessionManager:
         self._threads: Dict[int, threading.Thread] = {}
         self._lock = threading.Lock()
 
-    def create_session(self, name: str, strategy_names: List[str], mode: str = "PAPER") -> TradingSession:
+    def create_session(self, name: str, strategy_names: List[str], tickers: List[str], initial_balance: float = 10000.0, mode: str = "PAPER") -> TradingSession:
         db = SessionLocal()
         try:
-            # 1. Create DB Entry
-            session = TradingSession(name=name, mode=mode, status=SessionStatus.CREATED)
+            # 1. Create DB Entry with initial balance
+            session = TradingSession(name=name, mode=mode, status=SessionStatus.CREATED, initial_balance=initial_balance)
             db.add(session)
             db.commit()
             db.refresh(session)
@@ -38,8 +38,8 @@ class SessionManager:
                 from strategies.moving_average import MovingAverageCrossover
                 strategies.append(MovingAverageCrossover("DefaultGoldenCross", 10, 30))
             
-            # Initialize Engine
-            engine = self._init_engine(session, strategies)
+            # Initialize Engine with custom tickers and initial balance
+            engine = self._init_engine(session, strategies, tickers, initial_balance)
             with self._lock:
                 self._engines[session.id] = engine
                 
@@ -70,7 +70,7 @@ class SessionManager:
             logger.warning(f"Unknown strategy: {strategy_name}")
             return None
 
-    def _init_engine(self, session: TradingSession, strategies: list) -> TradingEngine:
+    def _init_engine(self, session: TradingSession, strategies: list, tickers: List[str], initial_balance: float) -> TradingEngine:
         broker = None
         paper = (session.mode == "PAPER")
         
@@ -81,13 +81,13 @@ class SessionManager:
 
         engine = TradingEngine(
             strategies=strategies,
-            tickers=["AAPL", "GOOGL", "TSLA"], # Configurable?
+            tickers=tickers,  # Use custom tickers
             interval=5,
             paper_trading=paper,
-            broker=broker
+            broker=broker,
+            session_id=session.id,  # Pass session_id in constructor
+            initial_balance=initial_balance  # Use custom initial balance
         )
-        # Inject session_id into engine
-        engine.session_id = session.id
         return engine
 
     def start_session(self, session_id: int):

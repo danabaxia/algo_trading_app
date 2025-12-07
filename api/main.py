@@ -49,6 +49,8 @@ def read_root():
 def create_session(
     name: str = Body(...),
     strategies: List[str] = Body(...),
+    tickers: List[str] = Body(["AAPL", "GOOGL", "TSLA"]),  # Default tickers
+    initial_balance: float = Body(10000.0),  # Default $10,000
     mode: str = Body("PAPER"),
     db: Session = Depends(get_db_session)
 ):
@@ -58,8 +60,8 @@ def create_session(
         raise HTTPException(status_code=400, detail=f"Session name '{name}' already exists. Please choose a different name.")
     
     try:
-        session = session_manager.create_session(name, strategies, mode)
-        return {"id": session.id, "name": session.name, "status": session.status, "mode": session.mode}
+        session = session_manager.create_session(name, strategies, tickers, initial_balance, mode)
+        return {"id": session.id, "name": session.name, "status": session.status, "mode": session.mode, "initial_balance": session.initial_balance}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -225,4 +227,46 @@ def get_strategies(db: Session = Depends(get_db_session)):
 @app.post("/control/start")
 def start_engine_legacy():
     return {"status": "error", "message": "Please use /sessions API"}
+
+# --- Stock Search ---
+import requests
+from config.settings import settings
+
+@app.get("/stocks/search")
+def search_stocks(query: str):
+    """Search for stocks using FMP API"""
+    if not query or len(query) < 1:
+        return []
+    
+    try:
+        api_key = settings.FMP_API_KEY
+        if not api_key:
+            raise HTTPException(status_code=500, detail="FMP API key not configured")
+        
+        # FMP Search endpoint
+        url = f"https://financialmodelingprep.com/api/v3/search?query={query}&limit=10&apikey={api_key}"
+        response = requests.get(url, timeout=5)
+        response.raise_for_status()
+        
+        results = response.json()
+        
+        # Format results
+        stocks = []
+        for item in results:
+            stocks.append({
+                "symbol": item.get("symbol", ""),
+                "name": item.get("name", ""),
+                "exchange": item.get("exchangeShortName", ""),
+                "type": item.get("type", "")
+            })
+        
+        # Filter to only stocks (not ETFs, indices, etc.)
+        stocks = [s for s in stocks if s["type"] in ["stock", ""] and s["exchange"] in ["NASDAQ", "NYSE", "AMEX", ""]]
+        
+        return stocks[:10]
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stock data: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
