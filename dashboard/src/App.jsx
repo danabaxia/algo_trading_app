@@ -3,6 +3,7 @@ import './App.css';
 import Home from './Home';
 import SessionsList from './SessionsList';
 import Dashboard from './Dashboard';
+import Documentation from './Documentation';
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/paper" element={<SessionsList mode="PAPER" />} />
         <Route path="/live" element={<SessionsList mode="LIVE" />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/docs" element={<Documentation />} />
       </Routes>
     </Router>
   );

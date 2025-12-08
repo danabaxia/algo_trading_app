@@ -25,6 +25,13 @@ const Home = () => {
                         <p>Trade with real money - Use with caution</p>
                         <button className="mode-btn danger">Enter Live Trading →</button>
                     </div>
+
+                    <div className="mode-card docs" onClick={() => navigate('/docs')}>
+                        <div className="mode-icon">📚</div>
+                        <h2>Documentation</h2>
+                        <p>Learn about strategies and how the bot works</p>
+                        <button className="mode-btn" style={{ background: '#a78bfa', color: '#fff' }}>Read Docs →</button>
+                    </div>
                 </div>
             </div>
         </div>
