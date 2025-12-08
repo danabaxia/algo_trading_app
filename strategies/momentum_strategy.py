@@ -19,7 +19,9 @@ class MomentumStrategy(BaseStrategy):
     
     def on_data(self, data):
         """Process new data"""
-        pass
+        price = data.get("price")
+        if price:
+            self.price_history.append(price)
         
     def calculate_momentum(self):
         """Calculate price momentum as percentage change"""
@@ -36,12 +38,6 @@ class MomentumStrategy(BaseStrategy):
         return momentum
     
     def should_buy(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-            
-        self.price_history.append(price)
-        
         if len(self.price_history) < self.lookback_period + 1:
             return False
         
@@ -54,13 +50,6 @@ class MomentumStrategy(BaseStrategy):
         return False
     
     def should_sell(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-        
-        if price not in self.price_history:
-            self.price_history.append(price)
-        
         if len(self.price_history) < self.lookback_period + 1:
             return False
         

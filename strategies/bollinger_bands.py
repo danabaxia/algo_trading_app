@@ -20,7 +20,9 @@ class BollingerBandsStrategy(BaseStrategy):
     
     def on_data(self, data):
         """Process new data"""
-        pass
+        price = data.get("price")
+        if price:
+            self.price_history.append(price)
         
     def calculate_bands(self):
         """Calculate Bollinger Bands"""
@@ -40,17 +42,14 @@ class BollingerBandsStrategy(BaseStrategy):
         return upper_band, sma, lower_band
     
     def should_buy(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-            
-        self.price_history.append(price)
-        
         upper, middle, lower = self.calculate_bands()
         
         if lower is None:
             return False
         
+        price = data.get("price")
+        if not price: return False
+
         # Buy when price touches or goes below lower band (oversold)
         if price <= lower and self.position is None:
             self.position = "LONG"
@@ -58,17 +57,13 @@ class BollingerBandsStrategy(BaseStrategy):
         return False
     
     def should_sell(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-        
-        if price not in self.price_history:
-            self.price_history.append(price)
-        
         upper, middle, lower = self.calculate_bands()
         
         if upper is None:
             return False
+            
+        price = data.get("price")
+        if not price: return False
         
         # Sell when price touches or goes above upper band (overbought)
         if price >= upper and self.position == "LONG":

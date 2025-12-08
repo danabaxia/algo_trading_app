@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import './SessionsList.css';
+import TickerSearch from './TickerSearch';
 
-const API_URL = "http://localhost:8000";
+const API_URL = "http://localhost:8001";
 
 const SessionsList = ({ mode }) => {
     const navigate = useNavigate();
     const [sessions, setSessions] = useState([]);
-    const [showCreate, setShowCreate] = useState(false);
-    const [newSessionName, setNewSessionName] = useState("");
+
+    // Modal & Form State
+    const [showModal, setShowModal] = useState(false);
+    const [availStrategies, setAvailStrategies] = useState([]);
+    const [formData, setFormData] = useState({
+        name: "",
+        capital: 10000,
+        tickers: "AAPL, GOOGL, TSLA",
+        strategies: ["GoldenCross_SMA"] // Default selection
+    });
 
     const fetchSessions = async () => {
         try {
@@ -23,22 +32,64 @@ const SessionsList = ({ mode }) => {
 
     useEffect(() => {
         fetchSessions();
+
+        // Fetch strategies
+        axios.get(`${API_URL}/strategies`)
+            .then(res => setAvailStrategies(res.data))
+            .catch(e => console.error("Failed to fetch strategies", e));
     }, [mode]);
 
-    const quickStart = async () => {
-        const sessionName = `${mode} - ${new Date().toLocaleString()}`;
+    const handleAddTickersFromSearch = (newTickers) => {
+        const current = formData.tickers.split(',').map(t => t.trim()).filter(t => t);
+        const combined = [...new Set([...current, ...newTickers])];
+        setFormData({ ...formData, tickers: combined.join(', ') });
+    };
+
+    const removeTicker = (ticker) => {
+        const current = formData.tickers.split(',').map(t => t.trim()).filter(t => t);
+        const filtered = current.filter(t => t !== ticker);
+        setFormData({ ...formData, tickers: filtered.join(', ') });
+    };
+
+    const handleCreateSession = async () => {
+        const tickersList = formData.tickers.split(',').map(t => t.trim()).filter(t => t);
+
+        if (formData.strategies.length === 0) {
+            alert("Please select at least one strategy.");
+            return;
+        }
+
+        const sessionName = formData.name.trim() || `${mode} - ${new Date().toLocaleString()}`;
+
         try {
-            const response = await axios.post(`${API_URL}/sessions`, {
+            await axios.post(`${API_URL}/sessions`, {
                 name: sessionName,
-                strategies: ["GoldenCross_SMA", "RSI_Oscillator"],
-                tickers: ["AAPL", "GOOGL", "TSLA"],
-                initial_balance: 10000,
+                strategies: formData.strategies,
+                tickers: tickersList,
+                initial_balance: parseFloat(formData.capital),
                 mode: mode
             });
-            navigate(`/dashboard?session_id=${response.data.id}`);
+            setShowModal(false);
+            fetchSessions();
+            // Reset form
+            setFormData({
+                name: "",
+                capital: 10000,
+                tickers: "AAPL, GOOGL, TSLA",
+                strategies: ["GoldenCross_SMA"]
+            });
         } catch (e) {
             alert("Failed to start session: " + (e.response?.data?.detail || e.message));
         }
+    };
+
+    const toggleStrategy = (stratName) => {
+        setFormData(prev => {
+            if (prev.strategies.includes(stratName)) {
+                return { ...prev, strategies: prev.strategies.filter(s => s !== stratName) };
+            }
+            return { ...prev, strategies: [...prev.strategies, stratName] };
+        });
     };
 
     const handleDelete = async (sessionId, e) => {
@@ -75,7 +126,7 @@ const SessionsList = ({ mode }) => {
                         <h1>{mode === 'PAPER' ? '📝 Paper Trading' : '🔴 Live Trading'}</h1>
                         <p>{mode === 'PAPER' ? 'Virtual money sessions' : 'Real money sessions'}</p>
                     </div>
-                    <button className="new-session-btn" onClick={quickStart}>
+                    <button className="new-session-btn" onClick={() => setShowModal(true)}>
                         + New Session
                     </button>
                 </div>
@@ -83,7 +134,7 @@ const SessionsList = ({ mode }) => {
                 {sessions.length === 0 ? (
                     <div className="empty-state">
                         <p>No sessions yet. Create one to get started!</p>
-                        <button className="create-first-btn" onClick={quickStart}>
+                        <button className="create-first-btn" onClick={() => setShowModal(true)}>
                             Create First Session
                         </button>
                     </div>
@@ -131,6 +182,77 @@ const SessionsList = ({ mode }) => {
                     </table>
                 )}
             </div>
+
+            {/* Create Session Modal */}
+            {showModal && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <h2>Create New Session</h2>
+
+                        <div className="form-group">
+                            <label>Session Name (Optional)</label>
+                            <input
+                                type="text"
+                                placeholder="E.g. Alpha Test 1"
+                                value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Initial Capital ($)</label>
+                            <input
+                                type="number"
+                                value={formData.capital}
+                                onChange={e => setFormData({ ...formData, capital: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label>Strategies</label>
+                            <div className="strategies-grid">
+                                {availStrategies.map((s, i) => (
+                                    <div
+                                        key={i}
+                                        className="strategy-check"
+                                        onClick={() => toggleStrategy(s.name)}
+                                        style={{ borderColor: formData.strategies.includes(s.name) ? 'var(--accent-blue)' : 'transparent' }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.strategies.includes(s.name)}
+                                            readOnly
+                                        />
+                                        <span>{s.name}</span>
+                                    </div>
+                                ))}
+                                {availStrategies.length === 0 && <p style={{ color: '#666' }}>No strategies found.</p>}
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label>Tickers</label>
+                            <div style={{ marginBottom: '0.5rem' }}>
+                                <TickerSearch apiUrl={API_URL} onAddTickers={handleAddTickersFromSearch} />
+                            </div>
+                            <div className="selected-tickers-tags" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                {formData.tickers.split(',').map(t => t.trim()).filter(t => t).map(t => (
+                                    <div key={t} className="ticker-tag" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}>
+                                        <span>{t}</span>
+                                        <button onClick={() => removeTicker(t)}>×</button>
+                                    </div>
+                                ))}
+                                {formData.tickers.trim() === '' && <span style={{ color: '#666', fontStyle: 'italic' }}>No tickers selected</span>}
+                            </div>
+                        </div>
+
+                        <div className="modal-actions">
+                            <button className="cancel-btn" onClick={() => setShowModal(false)}>Cancel</button>
+                            <button className="create-btn" onClick={handleCreateSession}>Create Session</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

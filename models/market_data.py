@@ -40,6 +40,19 @@ class MarketDataFetcher:
             return data[0].get('price')
         return None
 
+    def get_prices(self, tickers):
+        """
+        Fetch real-time prices for multiple tickers in one request.
+        Returns dict: {'AAPL': 150.0, ...}
+        """
+        if not tickers: return {}
+        # FMP supports comma separated tickers
+        ticker_str = ",".join(tickers)
+        data = self._request_api(f"quote-short/{ticker_str}")
+        if data and isinstance(data, list):
+            return {item.get('symbol'): item.get('price') for item in data}
+        return {}
+
     def get_historical_candles(self, ticker, interval="1min", limit=100):
         """
         Fetch historical OHLCV candles (intraday).

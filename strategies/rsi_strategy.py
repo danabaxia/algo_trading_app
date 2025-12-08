@@ -20,7 +20,9 @@ class RSIStrategy(BaseStrategy):
     
     def on_data(self, data):
         """Process new data"""
-        pass
+        price = data.get("price")
+        if price:
+            self.price_history.append(price)
         
     def calculate_rsi(self):
         """Calculate RSI from price history"""
@@ -30,8 +32,11 @@ class RSIStrategy(BaseStrategy):
         gains = []
         losses = []
         
-        for i in range(1, len(self.price_history)):
-            change = self.price_history[i] - self.price_history[i-1]
+        # Use history
+        history_list = list(self.price_history)
+        
+        for i in range(1, len(history_list)):
+            change = history_list[i] - history_list[i-1]
             if change > 0:
                 gains.append(change)
                 losses.append(0)
@@ -50,15 +55,9 @@ class RSIStrategy(BaseStrategy):
         return rsi
     
     def should_buy(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-            
-        self.price_history.append(price)
-        
         if len(self.price_history) < self.period + 1:
             return False
-        
+            
         rsi = self.calculate_rsi()
         
         # Buy when oversold and we don't have a position
@@ -68,14 +67,6 @@ class RSIStrategy(BaseStrategy):
         return False
     
     def should_sell(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-        
-        # Update price history
-        if price not in self.price_history:
-            self.price_history.append(price)
-        
         if len(self.price_history) < self.period + 1:
             return False
         

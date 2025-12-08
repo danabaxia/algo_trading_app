@@ -16,6 +16,8 @@ class MACDStrategy(BaseStrategy):
         self.position = None
         self.prev_macd = None
         self.prev_signal = None
+        self.latest_macd = None
+        self.latest_signal = None
     
     def initialize(self, context):
         """Initialize strategy"""
@@ -23,7 +25,10 @@ class MACDStrategy(BaseStrategy):
     
     def on_data(self, data):
         """Process new data"""
-        pass
+        price = data.get("price")
+        if price:
+            self.price_history.append(price)
+            self.latest_macd, self.latest_signal = self.calculate_macd()
         
     def calculate_ema(self, prices, period):
         """Calculate Exponential Moving Average"""
@@ -59,13 +64,7 @@ class MACDStrategy(BaseStrategy):
         return macd, signal
     
     def should_buy(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-            
-        self.price_history.append(price)
-        
-        macd, signal = self.calculate_macd()
+        macd, signal = self.latest_macd, self.latest_signal
         
         if macd is None or signal is None:
             return False
@@ -84,14 +83,7 @@ class MACDStrategy(BaseStrategy):
         return False
     
     def should_sell(self, data):
-        price = data.get("price")
-        if not price:
-            return False
-        
-        if price not in self.price_history:
-            self.price_history.append(price)
-        
-        macd, signal = self.calculate_macd()
+        macd, signal = self.latest_macd, self.latest_signal
         
         if macd is None or signal is None:
             return False
