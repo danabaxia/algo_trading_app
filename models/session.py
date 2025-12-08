@@ -20,6 +20,11 @@ class TradingSession(Base):
     
     initial_balance = Column(Float, default=10000.0)
     
+    # Configuration
+    buy_strategy_name = Column(String(100), nullable=True)
+    sell_strategy_name = Column(String(100), nullable=True)
+    ticker_selection_method = Column(String(20), default="MANUAL") # 'MANUAL' or 'ALGO'
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

@@ -128,8 +128,11 @@ def validate_stock_symbols(tickers: List[str]) -> List[str]:
 @app.post("/sessions")
 def create_session(
     name: str = Body(...),
-    strategies: List[str] = Body(...),
-    tickers: List[str] = Body(["AAPL", "GOOGL", "TSLA"]),  # Default tickers
+    strategies: List[str] = Body(None),
+    buy_strategy: str = Body(None),
+    sell_strategy: str = Body(None),
+    ticker_selection_method: str = Body("MANUAL"),
+    tickers: List[str] = Body(None),  # Default None
     initial_balance: float = Body(10000.0),  # Default $10,000
     mode: str = Body("PAPER"),
     db: Session = Depends(get_db_session)
@@ -143,7 +146,16 @@ def create_session(
         raise HTTPException(status_code=400, detail=f"Session name '{name}' already exists. Please choose a different name.")
     
     try:
-        session = session_manager.create_session(name, strategies, valid_tickers, initial_balance, mode)
+        session = session_manager.create_session(
+            name, 
+            strategies or [], 
+            valid_tickers, 
+            initial_balance, 
+            mode,
+            buy_strategy=buy_strategy,
+            sell_strategy=sell_strategy,
+            ticker_method=ticker_selection_method
+        )
         return {"id": session.id, "name": session.name, "status": session.status, "mode": session.mode, "initial_balance": session.initial_balance}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -338,18 +350,10 @@ def get_strategies(db: Session = Depends(get_db_session)):
 
 # --- Backtesting ---
 
+from strategies.factory import StrategyFactory
+
 def create_strategy_instance(strategy_name: str):
-    if "GoldenCross" in strategy_name or "SMA" in strategy_name:
-        return MovingAverageCrossover(strategy_name, short_window=10, long_window=30)
-    elif "RSI" in strategy_name:
-        return RSIStrategy(strategy_name, period=14, oversold=30, overbought=70)
-    elif "MACD" in strategy_name:
-        return MACDStrategy(strategy_name, fast_period=12, slow_period=26, signal_period=9)
-    elif "Bollinger" in strategy_name:
-        return BollingerBandsStrategy(strategy_name, period=20, num_std=2)
-    elif "Momentum" in strategy_name:
-        return MomentumStrategy(strategy_name, lookback_period=10, threshold=0.02)
-    return None
+    return StrategyFactory.create_strategy(strategy_name)
 
 from models.session import SessionStrategy
 
@@ -393,25 +397,47 @@ def run_backtest(
 ):
     try:
         # Resolve Strategies from Session if not provided
+        strat_instances = []
+        
+        # Resolve Strategies
         if not strategies:
             session = db.query(TradingSession).get(session_id)
-            if session and session.strategies:
-                strategies = [s.strategy_name for s in session.strategies if s.is_active]
+            if session:
+                # 1. Check for Composite
+                if session.buy_strategy_name and session.sell_strategy_name:
+                    from strategies.composite_strategy import CompositeStrategy
+                    comp = CompositeStrategy("BacktestComposite", session.buy_strategy_name, session.sell_strategy_name)
+                    strat_instances.append(comp)
+                
+                # 2. Check for Legacy Strategies (if no composite or mixed usage)
+                elif session.strategies:
+                    strategies = [s.strategy_name for s in session.strategies if s.is_active]
         
-        # Fallback
-        if not strategies:
-             strategies = ["GoldenCross_SMA", "RSI_Oscillator"]
+        # If we didn't create a composite, populate from 'strategies' list
+        if not strat_instances and strategies:
+             for s_name in strategies:
+                # Skip "Composite:" markers if they exist in legacy list
+                if "Composite:" in s_name: continue
+                s = create_strategy_instance(s_name)
+                if s:
+                    strat_instances.append(s)
+        
+        # Fallback if still empty
+        if not strat_instances and not strategies:
+             # Try default
+             s = create_strategy_instance("GoldenCross_SMA")
+             if s: strat_instances.append(s)
+             
+        # Resolve Tickers
+        if not tickers:
+             from models.session import SessionTicker
+             db_tickers = db.query(SessionTicker).filter_by(session_id=session_id).all()
+             if db_tickers:
+                 tickers = [t.symbol for t in db_tickers]
 
-        # Resolve Tickers (Optional: If stored in DB in future, fetch here. For now default)
         if not tickers:
              tickers = ["AAPL", "GOOGL", "TSLA"]
-             
-        strat_instances = []
-        for s_name in strategies:
-            s = create_strategy_instance(s_name)
-            if s:
-                strat_instances.append(s)
-        
+
         if not strat_instances:
             raise HTTPException(status_code=400, detail="No valid strategies provided or recognized")
         
@@ -502,3 +528,15 @@ def remove_session_ticker(session_id: int, symbol: str, db: Session = Depends(ge
 
 
 
+@app.get("/strategies")
+def get_strategies(db: Session = Depends(get_db_session)):
+    from models.strategy_config import StrategyConfig
+    strategies = db.query(StrategyConfig).all()
+    results = []
+    for s in strategies:
+        results.append({
+            "name": s.name,
+            "description": s.description,
+            "parameters": s.parameters
+        })
+    return results

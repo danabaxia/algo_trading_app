@@ -16,49 +16,67 @@ class SessionManager:
         self._threads: Dict[int, threading.Thread] = {}
         self._lock = threading.Lock()
 
-    def create_session(self, name: str, strategy_names: List[str], tickers: List[str], initial_balance: float = 10000.0, mode: str = "PAPER") -> TradingSession:
+    def create_session(self, name: str, strategy_names: List[str], tickers: List[str], initial_balance: float = 10000.0, mode: str = "PAPER", buy_strategy: str = None, sell_strategy: str = None, ticker_method: str = "MANUAL") -> TradingSession:
         db = SessionLocal()
         try:
-            logger.info(f"Creating Session '{name}'. Tickers: {tickers}")
-            # 1. Create DB Entry with initial balance
-            session = TradingSession(name=name, mode=mode, status=SessionStatus.CREATED, initial_balance=initial_balance)
+            logger.info(f"Creating Session '{name}'. Method: {ticker_method}")
+            # 1. Create DB Entry with configuration
+            session = TradingSession(
+                name=name, 
+                mode=mode, 
+                status=SessionStatus.CREATED, 
+                initial_balance=initial_balance,
+                buy_strategy_name=buy_strategy,
+                sell_strategy_name=sell_strategy,
+                ticker_selection_method=ticker_method
+            )
             db.add(session)
             db.commit()
             db.refresh(session)
             
-            # Save Strategies to DB
-            from models.session import SessionStrategy
-            for s_name in strategy_names:
-                db_strat = SessionStrategy(session_id=session.id, strategy_name=s_name, is_active=True)
-                db.add(db_strat)
-            
-            # Save Tickers to DB
+            # Save Tickers to DB (if MANUAL)
             from models.session import SessionTicker
             if tickers:
                 for ticker in tickers:
-                    logger.info(f"Adding ticker {ticker} to session {session.id}")
                     db_ticker = SessionTicker(session_id=session.id, symbol=ticker)
                     db.add(db_ticker)
-            else:
-                logger.warning(f"No tickers provided for session {session.id}")
-                
+            
+            # Legacy: Save separate strategies if provided (for view compatibility)
+            from models.session import SessionStrategy
+            if strategy_names:
+                for s_name in strategy_names:
+                    db_strat = SessionStrategy(session_id=session.id, strategy_name=s_name, is_active=True)
+                    db.add(db_strat)
+            elif buy_strategy and sell_strategy:
+                 # Add "Composite" virtual entry for viewing
+                 db.add(SessionStrategy(session_id=session.id, strategy_name=f"Composite: {buy_strategy}/{sell_strategy}", is_active=True))
+
             db.commit()
             
-            # 2. Instantiate Strategies based on names
+            # 2. Instantiate Strategies
             strategies = []
-            for s_name in strategy_names:
-                strategy = self._create_strategy(s_name)
-                if strategy:
-                    strategies.append(strategy)
+            
+            # If explicit buy/sell provided, use Composite
+            if buy_strategy and sell_strategy:
+                from strategies.composite_strategy import CompositeStrategy
+                comp_name = f"{buy_strategy}_{sell_strategy}_Composite"
+                comp_strat = CompositeStrategy(comp_name, buy_strategy, sell_strategy)
+                strategies.append(comp_strat)
+            else:
+                 # Legacy list support
+                 for s_name in strategy_names:
+                    strategy = self._create_strategy(s_name)
+                    if strategy:
+                        strategies.append(strategy)
             
             if not strategies:
-                logger.warning(f"No valid strategies for session {session.id}")
-                # Use default strategy
+                logger.warning(f"No valid strategies for session {session.id}. Using Default.")
                 from strategies.moving_average import MovingAverageCrossover
                 strategies.append(MovingAverageCrossover("DefaultGoldenCross", 10, 30))
             
-            # Initialize Engine with custom tickers and initial balance
+            # Initialize Engine
             engine = self._init_engine(session, strategies, tickers, initial_balance)
+
             with self._lock:
                 self._engines[session.id] = engine
                 
@@ -71,27 +89,8 @@ class SessionManager:
             db.close()
 
     def _create_strategy(self, name: str):
-        try:
-            from strategies.rsi_strategy import RSIStrategy
-            from strategies.macd_strategy import MACDStrategy
-            from strategies.bollinger_bands import BollingerBandsStrategy
-            from strategies.momentum_strategy import MomentumStrategy
-            
-            if name == "GoldenCross_SMA":
-                return MovingAverageCrossover("GoldenCross_SMA", 10, 30)
-            elif name == "RSI_Oscillator":
-                return RSIStrategy("RSI_Oscillator", 14, 30, 70)
-            elif name == "MACD_Crossover":
-                return MACDStrategy("MACD_Crossover", 12, 26, 9)
-            elif name == "Bollinger_MeanReversion":
-                return BollingerBandsStrategy("Bollinger_MeanReversion", 20, 2)
-            elif name == "Momentum_Breakout":
-                return MomentumStrategy("Momentum_Breakout", 10, 0.02)
-            # Default fallback if name matches simpler pattern or Custom
-            return None
-        except Exception as e:
-            logger.error(f"Error creating strategy {name}: {e}")
-            return None
+        from strategies.factory import StrategyFactory
+        return StrategyFactory.create_strategy(name)
 
     def _init_engine(self, session_obj, strategies, tickers, balance):
         mode_paper = True
@@ -123,13 +122,29 @@ class SessionManager:
                     # Revive from DB
                     logger.info(f"Reviving session {session_id} from DB")
                     
-                    strategy_names = []
-                    if s.strategies:
-                         strategy_names = [st.strategy_name for st in s.strategies if st.is_active]
+                    strategies = []
                     
-                    if not strategy_names:
+                    # 1. Check for Composite Configuration
+                    if s.buy_strategy_name and s.sell_strategy_name:
+                         from strategies.composite_strategy import CompositeStrategy
+                         comp_name = f"{s.buy_strategy_name}_{s.sell_strategy_name}_Composite"
+                         strategies.append(CompositeStrategy(comp_name, s.buy_strategy_name, s.sell_strategy_name))
+                    else:
+                        # 2. Legacy Strategy List
+                        strategy_names = []
+                        if s.strategies:
+                             strategy_names = [st.strategy_name for st in s.strategies if st.is_active]
+                        
+                        for name in strategy_names:
+                            # Avoid duplicates or composite markers
+                            if "Composite:" in name: continue
+                            strat = self._create_strategy(name)
+                            if strat: strategies.append(strat)
+                    
+                    if not strategies:
                         logger.info("No active strategies found in DB, using defaults")
-                        strategy_names = ["GoldenCross_SMA", "RSI_Oscillator"] 
+                        default_strat = self._create_strategy("GoldenCross_SMA")
+                        if default_strat: strategies.append(default_strat)
                     
                     # Load Tickers from DB
                     tickers = []
@@ -137,13 +152,8 @@ class SessionManager:
                         tickers = [t.symbol for t in s.tickers]
                     
                     if not tickers:
-                        tickers = ["AAPL", "GOOGL", "TSLA"] # Fallback
+                        logger.warning(f"Session {session_id} has no tickers assigned.")
                     
-                    strategies = []
-                    for name in strategy_names:
-                        strat = self._create_strategy(name)
-                        if strat: strategies.append(strat)
-                        
                     engine = self._init_engine(s, strategies, tickers, s.initial_balance)
                     self._engines[session_id] = engine
                 finally:

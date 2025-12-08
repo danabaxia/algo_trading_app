@@ -28,6 +28,14 @@ class BacktestEngine:
             for ticker in tickers
         }
         
+        # Initialize all strategies
+        for ticker, strats in self.ticker_strategies.items():
+            for s in strats:
+                try:
+                    s.initialize({"ticker": ticker})
+                except Exception as e:
+                    logger.error(f"Failed to initialize strategy {s.name} for {ticker}: {e}")
+        
         self.market_data = MarketDataFetcher()
         self.portfolio_value = initial_capital
         self.cash = initial_capital

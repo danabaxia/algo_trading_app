@@ -230,25 +230,55 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    {/* Active Strategies Table */}
+                    {/* Session Configuration & Strategies */}
                     <div className="card" style={{ marginBottom: '2rem' }}>
-                        <h3>Active Strategies</h3>
-                        {sessionStrategies.length === 0 ? <p>No strategies configured.</p> : (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <h3>Session Configuration</h3>
+                            {/* If we have specific buy/sell strats, show them clearly */}
+                        </div>
+
+                        {sessionDetails?.buy_strategy_name ? (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+                                <div className="metric-box" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
+                                    <label style={{ color: '#10b981' }}>Buy Algorithm</label>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{sessionDetails.buy_strategy_name}</span>
+                                </div>
+                                <div className="metric-box" style={{ background: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                                    <label style={{ color: '#ef4444' }}>Sell Algorithm</label>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{sessionDetails.sell_strategy_name}</span>
+                                </div>
+                                <div className="metric-box" style={{ background: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+                                    <label style={{ color: '#3b82f6' }}>Ticker Selection</label>
+                                    <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>
+                                        {sessionDetails.ticker_selection_method === 'ALGO' ? '🤖 Algorithmic / Screener' : '✋ Manual Watchlist'}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : null}
+
+                        {/* Strategy Toggles (Legacy or Composite Control) */}
+                        <h4 style={{ color: 'var(--text-secondary)', marginBottom: '0.5rem', fontSize: '0.9rem', textTransform: 'uppercase' }}>
+                            Strategy Control
+                        </h4>
+                        {sessionStrategies.length === 0 ? <p style={{ color: '#666' }}>No active strategy modules.</p> : (
                             <table className="sessions-table">
                                 <thead>
                                     <tr>
-                                        <th>Strategy Name</th>
+                                        <th>Module Name</th>
                                         <th>Status</th>
-                                        <th>Toggle</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {sessionStrategies.map(s => (
                                         <tr key={s.id}>
-                                            <td><b>{s.name}</b></td>
+                                            <td>
+                                                <b>{s.name}</b>
+                                                {s.name.includes('Composite') && <span style={{ fontSize: '0.8rem', color: '#888', marginLeft: '0.5rem' }}>(Composite Wrapper)</span>}
+                                            </td>
                                             <td>
                                                 <span className={`badge ${s.is_active ? 'badge-buy' : 'badge-sell'}`}>
-                                                    {s.is_active ? 'ACTIVE' : 'INACTIVE'}
+                                                    {s.is_active ? 'ACTIVE' : 'PAUSED'}
                                                 </span>
                                             </td>
                                             <td>
@@ -257,7 +287,7 @@ const Dashboard = () => {
                                                     style={{ padding: '0.25rem 0.75rem', fontSize: '0.85rem', background: s.is_active ? 'var(--accent-red)' : 'var(--accent-green)' }}
                                                     onClick={() => handleToggleStrategy(s.name)}
                                                 >
-                                                    {s.is_active ? 'Disable' : 'Enable'}
+                                                    {s.is_active ? 'Pause' : 'Resume'}
                                                 </button>
                                             </td>
                                         </tr>
