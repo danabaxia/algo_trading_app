@@ -27,7 +27,7 @@ Run `uname -a` or check the OS.
     ```bash
     ssh -N -L 3306:127.0.0.1:3306 devuser@192.168.4.42
     ```
-*   **Credential**: `Hjbljy88$$` (if prompted, though keys are preferred).
+*   **Credential**: Uses `SSH_PASSWORD` from `.env` (Value: `Hjbljy88$$`).
 *   **Verification**: Check if port 3306 is listening locally.
 
 **Step 3: Start Local API Service**
